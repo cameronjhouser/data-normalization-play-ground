@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Normalization Tool — 1NF · 2NF · 3NF</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f1f5f9;
+    color: #1e293b;
+    height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  #sidebar {
+    width: 280px;
+    min-width: 280px;
+    background: #fff;
+    border-right: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    z-index: 10;
+    box-shadow: 2px 0 8px rgba(0,0,0,.06);
+  }
+
+  #sidebar-title {
+    padding: 18px 16px 14px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #4f46e5;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #sidebar-title svg { flex-shrink: 0; }
+
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .tab-btn {
+    flex: 1;
+    padding: 10px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: color .15s, border-color .15s;
+  }
+  .tab-btn.active {
+    color: #4f46e5;
+    border-bottom-color: #4f46e5;
+  }
+
+  .tab-panel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tab-panel.active { display: flex; }
+
+  .tab-scroll { flex: 1; overflow-y: auto; padding: 12px; }
+
+  /* Upload tab */
+  .upload-zone {
+    border: 2px dashed #c7d2fe;
+    border-radius: 8px;
+    padding: 18px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: background .15s, border-color .15s;
+    background: #f5f3ff;
+    margin-bottom: 12px;
+  }
+  .upload-zone:hover { background: #ede9fe; border-color: #818cf8; }
+  .upload-zone input { display: none; }
+  .upload-zone .uz-icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone p { font-size: 12px; color: #6366f1; font-weight: 500; }
+  .upload-zone span { font-size: 11px; color: #94a3b8; }
+
+.table-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .table-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .table-list-item .tli-name { color: #1e293b; }
+  .table-list-item .tli-count { color: #94a3b8; font-size: 11px; }
+  .tli-del {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: .6;
+  }
+  .tli-del:hover { opacity: 1; }
+
+  /* NF Guide tab */
+  .nf-section { margin-bottom: 8px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; }
+  .nf-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    cursor: pointer;
+    background: #f8fafc;
+    user-select: none;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .nf-header:hover { background: #f1f5f9; }
+  .nf-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .nf-badge.nf1 { background: #6366f1; }
+  .nf-badge.nf2 { background: #0ea5e9; }
+  .nf-badge.nf3 { background: #10b981; }
+  .nf-chevron { transition: transform .2s; font-size: 12px; color: #94a3b8; }
+  .nf-section.open .nf-chevron { transform: rotate(180deg); }
+  .nf-body { display: none; padding: 12px; background: #fff; font-size: 12px; line-height: 1.7; color: #334155; }
+  .nf-section.open .nf-body { display: block; }
+  .nf-body h4 { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #64748b; margin: 8px 0 4px; }
+  .nf-body ul { padding-left: 16px; }
+  .nf-body li { margin-bottom: 3px; }
+  .nf-example {
+    background: #f8fafc;
+    border-left: 3px solid #c7d2fe;
+    padding: 8px 10px;
+    border-radius: 0 4px 4px 0;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    margin-top: 6px;
+    color: #475569;
+  }
+  .nf-example strong { color: #4f46e5; }
+
+  /* Relations tab */
+  .rel-list { display: flex; flex-direction: column; gap: 6px; }
+  .rel-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    position: relative;
+  }
+  .rel-item .rel-path { color: #334155; font-weight: 500; margin-bottom: 4px; word-break: break-all; }
+  .rel-item .rel-footer { display: flex; align-items: center; justify-content: space-between; }
+  .rel-badge {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .rel-badge.t11 { background: #4f46e5; }
+  .rel-badge.t1n { background: #16a34a; }
+  .rel-badge.tmn { background: #db2777; }
+  .rel-del {
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    opacity: .65;
+  }
+  .rel-del:hover { opacity: 1; }
+  .rel-empty { text-align: center; color: #94a3b8; font-size: 12px; padding: 20px 0; }
+
+  /* ── Canvas ───────────────────────────────────────────────── */
+  #canvas-wrapper {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #canvas {
+    position: absolute;
+    inset: 0;
+    background-color: #f8fafc;
+    background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
+    background-size: 24px 24px;
+    overflow: hidden;
+  }
+
+  #svg-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 5;
+  }
+
+  /* Table cards */
+  .table-card {
+    position: absolute;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.10), 0 1px 4px rgba(0,0,0,.06);
+    min-width: 220px;
+    user-select: none;
+    z-index: 2;
+    border: 1px solid #e2e8f0;
+    transition: box-shadow .15s;
+  }
+  .table-card:hover { box-shadow: 0 8px 24px rgba(79,70,229,.13), 0 1px 4px rgba(0,0,0,.06); }
+  .table-card.connecting-source { box-shadow: 0 0 0 2px #4f46e5, 0 8px 24px rgba(79,70,229,.2); }
+
+  .table-card-header {
+    background: #4f46e5;
+    color: #fff;
+    padding: 9px 12px;
+    border-radius: 9px 9px 0 0;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: grab;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .table-card-header:active { cursor: grabbing; }
+  .table-card-header .tc-icon { opacity: .8; font-size: 12px; }
+
+  .table-card-body { padding: 6px 0; }
+
+  .col-row {
+    display: flex;
+    align-items: center;
+    padding: 5px 10px 5px 12px;
+    font-size: 12px;
+    gap: 6px;
+    position: relative;
+    transition: background .1s;
+  }
+  .col-row:hover { background: #f5f3ff; }
+.col-name { flex: 1; color: #334155; }
+  .col-type { font-size: 10px; color: #94a3b8; font-style: italic; }
+
+  .port {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #c7d2fe;
+    border: 2px solid #4f46e5;
+    cursor: crosshair;
+    flex-shrink: 0;
+    transition: background .15s, transform .15s;
+    position: relative;
+    z-index: 3;
+  }
+  .port:hover { background: #4f46e5; transform: scale(1.3); }
+  .port.active-port { background: #4f46e5; transform: scale(1.4); box-shadow: 0 0 0 3px #c7d2fe; }
+
+  /* ── Modal ───────────────────────────────────────────────── */
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(2px);
+  }
+  #modal-overlay.visible { display: flex; }
+
+  #modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 28px 24px 24px;
+    width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.18);
+    animation: modalIn .18s ease;
+  }
+  @keyframes modalIn {
+    from { transform: translateY(-12px) scale(.97); opacity: 0; }
+    to   { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  #modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #1e293b; }
+  #modal p  { font-size: 12px; color: #64748b; margin-bottom: 18px; }
+  .rel-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .rel-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: border-color .15s, background .15s;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .rel-option:hover { border-color: #818cf8; background: #f5f3ff; }
+  .rel-option.selected { border-color: #4f46e5; background: #eef2ff; }
+  .rel-option input { accent-color: #4f46e5; }
+  .rel-option-label { display: flex; flex-direction: column; }
+  .rel-option-label span { font-size: 10px; color: #94a3b8; font-weight: 400; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel {
+    padding: 8px 16px;
+    background: #f1f5f9;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    color: #64748b;
+  }
+  .btn-cancel:hover { background: #e2e8f0; }
+  .btn-confirm {
+    padding: 8px 18px;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-confirm:hover { background: #4338ca; }
+
+  /* ── Hint bar ────────────────────────────────────────────── */
+  #hint-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,41,59,.85);
+    color: #fff;
+    font-size: 12px;
+    padding: 7px 16px;
+    border-radius: 20px;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity .25s;
+    white-space: nowrap;
+  }
+  #hint-bar.visible { opacity: 1; }
+
+  /* SVG line hit area */
+  .line-hit {
+    pointer-events: stroke;
+    cursor: pointer;
+    stroke: transparent;
+    stroke-width: 12;
+    fill: none;
+  }
+
+  /* Per-NF sample button */
+  .btn-nf-sample {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 7px 12px;
+    background: #eef2ff;
+    color: #4f46e5;
+    border: 1px solid #c7d2fe;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background .15s;
+  }
+  .btn-nf-sample:hover { background: #e0e7ff; border-color: #818cf8; }
+
+  /* Tables tab section header */
+  .tables-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #94a3b8;
+    margin: 12px 0 6px;
+  }
+
+  /* ── Key badges (PK / FK) ─────────────────────────────────── */
+  .key-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-width: 22px;
+    text-align: center;
+    user-select: none;
+    border: 1px solid transparent;
+    transition: background .15s, transform .1s;
+    line-height: 14px;
+  }
+  .key-badge:hover { transform: scale(1.1); }
+  .key-badge.key-none  { color: #cbd5e1; border-color: #e2e8f0; background: transparent; }
+  .key-badge.key-pk    { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+  .key-badge.key-fk    { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+
+  /* ── Evaluation tab ───────────────────────────────────────── */
+  .btn-evaluate {
+    width: 100%;
+    padding: 9px;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 14px;
+    transition: background .15s;
+  }
+  .btn-evaluate:hover { background: #4338ca; }
+
+  .eval-legend {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+    font-size: 11px;
+    color: #64748b;
+    flex-wrap: wrap;
+  }
+  .eval-legend span { display: flex; align-items: center; gap: 3px; }
+
+  .eval-empty { text-align: center; color: #94a3b8; font-size: 12px; padding: 24px 0; }
+
+  .eval-table {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .eval-table-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .eval-table-header.pass { background: #f0fdf4; color: #166534; }
+  .eval-table-header.warn { background: #fffbeb; color: #92400e; }
+  .eval-table-header.fail { background: #fef2f2; color: #991b1b; }
+  .eval-score { font-size: 11px; opacity: .7; }
+
+  .eval-items { background: #fff; padding: 6px 0; }
+  .eval-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 7px;
+    padding: 5px 12px;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .eval-item.pass { color: #166534; }
+  .eval-item.fail { color: #991b1b; }
+  .eval-item.warn { color: #92400e; }
+  .eval-nf-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: #fff;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .eval-msg { flex: 1; white-space: pre-wrap; }
+
+  .eval-summary {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .eval-summary strong { font-size: 14px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ─────────────────────────────────────── -->
+<div id="sidebar">
+  <div id="sidebar-title">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4f46e5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+      <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+    </svg>
+    Data Normalization Tool
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" data-tab="upload">Tables</button>
+    <button class="tab-btn" data-tab="guide">NF Guide</button>
+    <button class="tab-btn" data-tab="relations">Relations</button>
+    <button class="tab-btn" data-tab="evaluate">Evaluate</button>
+  </div>
+
+  <!-- Upload/Tables Tab -->
+  <div class="tab-panel active" id="tab-upload">
+    <div class="tab-scroll">
+      <div class="upload-zone" id="upload-zone">
+        <input type="file" id="file-input" accept=".csv" multiple style="display:none">
+        <div class="uz-icon">📂</div>
+        <p>Click to upload CSV files</p>
+        <span>Each file becomes a table card</span>
+      </div>
+      <div class="tables-section-label">Tables on Canvas</div>
+      <div class="table-list" id="table-list"></div>
+    </div>
+  </div>
+
+  <!-- NF Guide Tab -->
+  <div class="tab-panel" id="tab-guide">
+    <div class="tab-scroll">
+
+      <div class="nf-section open" id="nf1-section">
+        <div class="nf-header" onclick="toggleNF('nf1-section')">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="nf-badge nf1">1NF</span>
+            First Normal Form
+          </div>
+          <span class="nf-chevron">▼</span>
+        </div>
+        <div class="nf-body">
+          <h4>Rules</h4>
+          <ul>
+            <li>Each column holds <strong>atomic</strong> (indivisible) values</li>
+            <li>No repeating groups or arrays in a column</li>
+            <li>Each row is <strong>uniquely identifiable</strong> (primary key)</li>
+            <li>All values in a column are of the same type</li>
+          </ul>
+          <h4>Violation Example</h4>
+          <div class="nf-example">
+            Orders(<strong>OrderID</strong>, CustomerName, <span style="color:#ef4444">Products</span>)<br>
+            → "Products" stores "Pen, Book, Ruler" — NOT atomic
+          </div>
+          <h4>Fix</h4>
+          <div class="nf-example">
+            Orders(<strong>OrderID</strong>, CustomerName)<br>
+            OrderItems(<strong>OrderID, ProductID</strong>, Quantity)
+          </div>
+          <button class="btn-nf-sample" onclick="loadSample1NF()">📋 Load 1NF Example Tables</button>
+        </div>
+      </div>
+
+      <div class="nf-section" id="nf2-section">
+        <div class="nf-header" onclick="toggleNF('nf2-section')">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="nf-badge nf2">2NF</span>
+            Second Normal Form
+          </div>
+          <span class="nf-chevron">▼</span>
+        </div>
+        <div class="nf-body">
+          <h4>Prerequisite</h4>
+          <ul><li>Must already be in 1NF</li></ul>
+          <h4>Rules</h4>
+          <ul>
+            <li>No <strong>partial dependencies</strong> — every non-key attribute must depend on the <em>entire</em> composite primary key, not just part of it</li>
+            <li>Only relevant when the primary key is <strong>composite</strong></li>
+          </ul>
+          <h4>Violation Example</h4>
+          <div class="nf-example">
+            OrderItems(<strong>OrderID, ProductID</strong>, Qty, <span style="color:#ef4444">ProductName</span>)<br>
+            → ProductName depends only on ProductID, not the full key
+          </div>
+          <h4>Fix</h4>
+          <div class="nf-example">
+            OrderItems(<strong>OrderID, ProductID</strong>, Qty)<br>
+            Products(<strong>ProductID</strong>, ProductName, Price)
+          </div>
+          <button class="btn-nf-sample" onclick="loadSample2NF()">📋 Load 2NF Example Tables</button>
+        </div>
+      </div>
+
+      <div class="nf-section" id="nf3-section">
+        <div class="nf-header" onclick="toggleNF('nf3-section')">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span class="nf-badge nf3">3NF</span>
+            Third Normal Form
+          </div>
+          <span class="nf-chevron">▼</span>
+        </div>
+        <div class="nf-body">
+          <h4>Prerequisite</h4>
+          <ul><li>Must already be in 2NF</li></ul>
+          <h4>Rules</h4>
+          <ul>
+            <li>No <strong>transitive dependencies</strong> — non-key attributes must not depend on other non-key attributes</li>
+            <li>Every attribute must depend <em>directly</em> on the primary key</li>
+          </ul>
+          <h4>Violation Example</h4>
+          <div class="nf-example">
+            Customers(<strong>CustomerID</strong>, Name, ZipCode, <span style="color:#ef4444">City</span>)<br>
+            → City depends on ZipCode, not CustomerID directly
+          </div>
+          <h4>Fix</h4>
+          <div class="nf-example">
+            Customers(<strong>CustomerID</strong>, Name, ZipCode)<br>
+            ZipCodes(<strong>ZipCode</strong>, City, State)
+          </div>
+          <h4>Summary Chain</h4>
+          <div class="nf-example">
+            1NF → atomic values<br>
+            2NF → no partial deps<br>
+            3NF → no transitive deps
+          </div>
+          <button class="btn-nf-sample" onclick="loadSample3NF()">📋 Load 3NF Example Tables</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Relations Tab -->
+  <div class="tab-panel" id="tab-relations">
+    <div class="tab-scroll">
+      <div class="rel-list" id="rel-list">
+        <div class="rel-empty">No relationships yet.<br>Click ports to connect columns.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Evaluate Tab -->
+  <div class="tab-panel" id="tab-evaluate">
+    <div class="tab-scroll">
+      <button class="btn-evaluate" id="btn-evaluate">🔍 Run Normalization Evaluation</button>
+      <div class="eval-legend">
+        <span>🟡 <b>PK</b> = Primary Key</span>
+        <span>🔵 <b>FK</b> = Foreign Key</span>
+        <span style="margin-top:2px;color:#94a3b8;font-size:10px">Tip: mark PK/FK on each table's columns first for best results.</span>
+      </div>
+      <div id="eval-results">
+        <div class="eval-empty">Click "Run Evaluation" to analyze your tables.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Canvas ─────────────────────────────────────── -->
+<div id="canvas-wrapper">
+  <div id="canvas">
+    <svg id="svg-overlay"></svg>
+  </div>
+  <div id="hint-bar">Click a port on another table to complete the connection · Esc to cancel</div>
+</div>
+
+<!-- ── Relationship Modal ─────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h3>Define Relationship</h3>
+    <p id="modal-desc">Choose the cardinality between the two columns.</p>
+    <div class="rel-options">
+      <label class="rel-option selected">
+        <input type="radio" name="rel-type" value="one-to-one" checked>
+        <div class="rel-option-label">
+          1 : 1 — One-to-One
+          <span>Each record in A relates to exactly one in B</span>
+        </div>
+      </label>
+      <label class="rel-option">
+        <input type="radio" name="rel-type" value="one-to-many">
+        <div class="rel-option-label">
+          1 : N — One-to-Many
+          <span>One record in A relates to many in B</span>
+        </div>
+      </label>
+      <label class="rel-option">
+        <input type="radio" name="rel-type" value="many-to-many">
+        <div class="rel-option-label">
+          M : N — Many-to-Many
+          <span>Many records in A relate to many in B</span>
+        </div>
+      </label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modal-cancel">Cancel</button>
+      <button class="btn-confirm" id="modal-confirm">Add Relationship</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────
+const state = {
+  tables: [],
+  relationships: [],
+  dragging: null,
+  connecting: null,
+  pending: null,
+  selectedRelType: 'one-to-one',
+  nextId: 1
+};
+
+// ─── DOM refs ─────────────────────────────────────────────────────────
+const canvas       = document.getElementById('canvas');
+const svgOverlay   = document.getElementById('svg-overlay');
+const hintBar      = document.getElementById('hint-bar');
+const modalOverlay = document.getElementById('modal-overlay');
+const modalDesc    = document.getElementById('modal-desc');
+const tableList    = document.getElementById('table-list');
+const relList      = document.getElementById('rel-list');
+const fileInput    = document.getElementById('file-input');
+
+// ─── Tab switching ────────────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+function toggleNF(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+// ─── CSV Parser ───────────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i+1] === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(field); field = ''; }
+      else if (ch === '\n' || ch === '\r') {
+        if (ch === '\r' && text[i+1] === '\n') i++;
+        row.push(field); field = '';
+        if (row.some(c => c.trim())) rows.push(row);
+        row = [];
+      } else { field += ch; }
+    }
+  }
+  if (field || row.length) { row.push(field); if (row.some(c => c.trim())) rows.push(row); }
+  return rows;
+}
+
+// ─── Add table from CSV ───────────────────────────────────────────────
+function addTableFromCSV(name, csvText) {
+  const rows = parseCSV(csvText);
+  if (!rows.length) return;
+  const columns = rows[0].map(c => c.trim()).filter(Boolean);
+  if (!columns.length) return;
+  const id = 'tbl_' + (state.nextId++);
+  const margin = 24;
+  const x = margin + (state.tables.length % 4) * 240;
+  const y = margin + Math.floor(state.tables.length / 4) * 260;
+  state.tables.push({ id, name, columns, x, y, pkCols: [0], fkCols: [] });
+  renderTable(state.tables[state.tables.length - 1]);
+  renderSidebarTables();
+}
+
+// ─── Render a single table card ───────────────────────────────────────
+function renderTable(tbl) {
+  const existing = document.getElementById(tbl.id);
+  if (existing) existing.remove();
+
+  const card = document.createElement('div');
+  card.className = 'table-card';
+  card.id = tbl.id;
+  card.style.left = tbl.x + 'px';
+  card.style.top  = tbl.y + 'px';
+
+  const header = document.createElement('div');
+  header.className = 'table-card-header';
+  header.innerHTML = `<span class="tc-icon">⊞</span>${escHtml(tbl.name)}`;
+  header.onmousedown = e => startDrag(e, tbl.id);
+  card.appendChild(header);
+
+  const body = document.createElement('div');
+  body.className = 'table-card-body';
+
+  tbl.columns.forEach((col, i) => {
+    const row = document.createElement('div');
+    row.className = 'col-row';
+    row.dataset.tableId = tbl.id;
+    row.dataset.colIndex = i;
+    const isPK = (tbl.pkCols || []).includes(i);
+    const isFK = (tbl.fkCols || []).includes(i);
+    const badgeCls = isPK ? 'key-pk' : isFK ? 'key-fk' : 'key-none';
+    const badgeLabel = isPK ? 'PK' : isFK ? 'FK' : '·';
+    const badgeTip = isPK ? 'Primary Key — click to set FK' : isFK ? 'Foreign Key — click to clear' : 'Click to mark as PK';
+    row.innerHTML = `
+      <span class="key-badge ${badgeCls}" data-table-id="${tbl.id}" data-col-index="${i}" title="${badgeTip}">${badgeLabel}</span>
+      <span class="col-name">${escHtml(col)}</span>
+      <div class="port" data-table-id="${tbl.id}" data-col-index="${i}"></div>
+    `;
+    body.appendChild(row);
+  });
+
+  card.appendChild(body);
+  canvas.appendChild(card);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ─── Sidebar tables list ──────────────────────────────────────────────
+function renderSidebarTables() {
+  if (!state.tables.length) {
+    tableList.innerHTML = '<div style="text-align:center;color:#94a3b8;font-size:12px;padding:12px 0">No tables yet. Upload a CSV or load sample data.</div>';
+    return;
+  }
+  tableList.innerHTML = '';
+  state.tables.forEach(tbl => {
+    const item = document.createElement('div');
+    item.className = 'table-list-item';
+    item.innerHTML = `
+      <span class="tli-name">⊞ ${escHtml(tbl.name)}</span>
+      <span class="tli-count">${tbl.columns.length} col${tbl.columns.length !== 1 ? 's' : ''}</span>
+      <button class="tli-del" data-del-table="${tbl.id}" title="Remove table">✕</button>
+    `;
+    tableList.appendChild(item);
+  });
+}
+
+tableList.addEventListener('click', e => {
+  const btn = e.target.closest('[data-del-table]');
+  if (!btn) return;
+  deleteTable(btn.dataset.delTable);
+});
+
+function deleteTable(id) {
+  state.tables = state.tables.filter(t => t.id !== id);
+  state.relationships = state.relationships.filter(r => r.fromTable !== id && r.toTable !== id);
+  document.getElementById(id)?.remove();
+  renderSidebarTables();
+  renderRelations();
+  renderAllLines();
+}
+
+// ─── Relations sidebar ────────────────────────────────────────────────
+function relTypeLabel(type) {
+  if (type === 'one-to-one') return { cls: 't11', label: '1:1' };
+  if (type === 'one-to-many') return { cls: 't1n', label: '1:N' };
+  return { cls: 'tmn', label: 'M:N' };
+}
+
+function renderRelations() {
+  if (!state.relationships.length) {
+    relList.innerHTML = '<div class="rel-empty">No relationships yet.<br>Click ports to connect columns.</div>';
+    return;
+  }
+  relList.innerHTML = '';
+  state.relationships.forEach(rel => {
+    const fromTbl = state.tables.find(t => t.id === rel.fromTable);
+    const toTbl   = state.tables.find(t => t.id === rel.toTable);
+    if (!fromTbl || !toTbl) return;
+    const fromCol = fromTbl.columns[rel.fromCol];
+    const toCol   = toTbl.columns[rel.toCol];
+    const { cls, label } = relTypeLabel(rel.type);
+    const item = document.createElement('div');
+    item.className = 'rel-item';
+    item.innerHTML = `
+      <div class="rel-path">${escHtml(fromTbl.name)}.<strong>${escHtml(fromCol)}</strong> ↔ ${escHtml(toTbl.name)}.<strong>${escHtml(toCol)}</strong></div>
+      <div class="rel-footer">
+        <span class="rel-badge ${cls}">${label}</span>
+        <button class="rel-del" data-del-rel="${rel.id}" title="Delete">✕</button>
+      </div>
+    `;
+    relList.appendChild(item);
+  });
+}
+
+relList.addEventListener('click', e => {
+  const btn = e.target.closest('[data-del-rel]');
+  if (!btn) return;
+  state.relationships = state.relationships.filter(r => r.id !== btn.dataset.delRel);
+  renderRelations();
+  renderAllLines();
+});
+
+// ─── Get port center relative to canvas ───────────────────────────────
+function getPortCenter(tableId, colIndex) {
+  const card = document.getElementById(tableId);
+  if (!card) return null;
+  const port = card.querySelector(`.port[data-table-id="${tableId}"][data-col-index="${colIndex}"]`);
+  if (!port) return null;
+  const portRect   = port.getBoundingClientRect();
+  const canvasRect = canvas.getBoundingClientRect();
+  return {
+    x: portRect.left + portRect.width / 2 - canvasRect.left,
+    y: portRect.top  + portRect.height / 2 - canvasRect.top
+  };
+}
+
+// ─── SVG lines ────────────────────────────────────────────────────────
+function typeColors(type) {
+  if (type === 'one-to-one')  return { stroke: '#4f46e5', fill: '#4f46e5' };
+  if (type === 'one-to-many') return { stroke: '#16a34a', fill: '#16a34a' };
+  return { stroke: '#db2777', fill: '#db2777' };
+}
+
+function typeShortLabel(type) {
+  if (type === 'one-to-one')  return '1:1';
+  if (type === 'one-to-many') return '1:N';
+  return 'M:N';
+}
+
+function renderAllLines(mouseX, mouseY) {
+  // Resize SVG to canvas
+  svgOverlay.setAttribute('width',  canvas.offsetWidth);
+  svgOverlay.setAttribute('height', canvas.offsetHeight);
+  svgOverlay.innerHTML = '';
+
+  // Draw saved relationships
+  state.relationships.forEach(rel => {
+    const p1 = getPortCenter(rel.fromTable, rel.fromCol);
+    const p2 = getPortCenter(rel.toTable, rel.toCol);
+    if (!p1 || !p2) return;
+    drawLine(p1, p2, rel.type, rel.id);
+  });
+
+  // Rubber band
+  if (state.connecting && mouseX !== undefined) {
+    const p1 = getPortCenter(state.connecting.tableId, state.connecting.colIndex);
+    if (p1) {
+      const dash = 'stroke-dasharray="6 4"';
+      const cp = Math.max(60, Math.abs(mouseX - p1.x) * 0.5);
+      const d = `M ${p1.x} ${p1.y} C ${p1.x + cp} ${p1.y}, ${mouseX - cp} ${mouseY}, ${mouseX} ${mouseY}`;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('stroke', '#94a3b8');
+      path.setAttribute('stroke-width', '2');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke-dasharray', '6 4');
+      path.setAttribute('opacity', '0.7');
+      svgOverlay.appendChild(path);
+    }
+  }
+}
+
+function drawLine(p1, p2, type, relId) {
+  const { stroke, fill } = typeColors(type);
+  const label = typeShortLabel(type);
+  const isDash = type === 'many-to-many';
+  const cp = Math.max(60, Math.abs(p2.x - p1.x) * 0.5);
+  const d  = `M ${p1.x} ${p1.y} C ${p1.x + cp} ${p1.y}, ${p2.x - cp} ${p2.y}, ${p2.x} ${p2.y}`;
+
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+  // Hit-test path (wide transparent)
+  const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  hitPath.setAttribute('d', d);
+  hitPath.setAttribute('class', 'line-hit');
+  hitPath.style.pointerEvents = 'stroke';
+  g.appendChild(hitPath);
+
+  // Visible path
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke', stroke);
+  path.setAttribute('stroke-width', '2');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('opacity', '0.85');
+  if (isDash) path.setAttribute('stroke-dasharray', '7 4');
+  g.appendChild(path);
+
+  // Midpoint for badge
+  const mx = (p1.x + p2.x) / 2;
+  const my = (p1.y + p2.y) / 2;
+
+  // Badge rect
+  const bw = 30, bh = 16, br = 4;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', mx - bw/2);
+  rect.setAttribute('y', my - bh/2);
+  rect.setAttribute('width', bw);
+  rect.setAttribute('height', bh);
+  rect.setAttribute('rx', br);
+  rect.setAttribute('fill', fill);
+  g.appendChild(rect);
+
+  // Badge text
+  const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  text.setAttribute('x', mx);
+  text.setAttribute('y', my + 4);
+  text.setAttribute('text-anchor', 'middle');
+  text.setAttribute('fill', '#fff');
+  text.setAttribute('font-size', '9');
+  text.setAttribute('font-family', '-apple-system, BlinkMacSystemFont, sans-serif');
+  text.setAttribute('font-weight', '700');
+  text.textContent = label;
+  g.appendChild(text);
+
+  // Delete circle
+  const delX = mx + bw/2 + 8;
+  const delY = my - bh/2 - 4;
+
+  const delCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+  delCircle.setAttribute('cx', delX);
+  delCircle.setAttribute('cy', delY);
+  delCircle.setAttribute('r', '7');
+  delCircle.setAttribute('fill', '#ef4444');
+  delCircle.setAttribute('style', 'cursor:pointer; pointer-events: all;');
+  delCircle.setAttribute('data-del-rel', relId);
+  g.appendChild(delCircle);
+
+  const delText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  delText.setAttribute('x', delX);
+  delText.setAttribute('y', delY + 4);
+  delText.setAttribute('text-anchor', 'middle');
+  delText.setAttribute('fill', '#fff');
+  delText.setAttribute('font-size', '10');
+  delText.setAttribute('font-weight', '700');
+  delText.setAttribute('style', 'cursor:pointer; pointer-events: none;');
+  delText.textContent = '×';
+  g.appendChild(delText);
+
+  svgOverlay.appendChild(g);
+}
+
+// SVG delete handler
+svgOverlay.addEventListener('click', e => {
+  const relId = e.target.getAttribute('data-del-rel');
+  if (relId) {
+    state.relationships = state.relationships.filter(r => r.id !== relId);
+    renderRelations();
+    renderAllLines();
+  }
+});
+
+// ─── Key badge (PK / FK) cycling ──────────────────────────────────────
+canvas.addEventListener('click', e => {
+  const badge = e.target.closest('.key-badge');
+  if (!badge) return;
+  e.stopPropagation();
+  const tableId  = badge.dataset.tableId;
+  const colIndex = parseInt(badge.dataset.colIndex, 10);
+  cycleKeyBadge(tableId, colIndex);
+}, true);
+
+function cycleKeyBadge(tableId, colIndex) {
+  const tbl = state.tables.find(t => t.id === tableId);
+  if (!tbl) return;
+  tbl.pkCols = tbl.pkCols || [];
+  tbl.fkCols = tbl.fkCols || [];
+  const isPK = tbl.pkCols.includes(colIndex);
+  const isFK = tbl.fkCols.includes(colIndex);
+  if (!isPK && !isFK) {
+    // none → PK
+    tbl.pkCols = [...tbl.pkCols, colIndex];
+  } else if (isPK) {
+    // PK → FK
+    tbl.pkCols = tbl.pkCols.filter(i => i !== colIndex);
+    tbl.fkCols = [...tbl.fkCols, colIndex];
+  } else {
+    // FK → none
+    tbl.fkCols = tbl.fkCols.filter(i => i !== colIndex);
+  }
+  // Update just this badge in the DOM
+  const badge = document.querySelector(`.key-badge[data-table-id="${tableId}"][data-col-index="${colIndex}"]`);
+  if (!badge) return;
+  const nowPK = tbl.pkCols.includes(colIndex);
+  const nowFK = tbl.fkCols.includes(colIndex);
+  badge.className = 'key-badge ' + (nowPK ? 'key-pk' : nowFK ? 'key-fk' : 'key-none');
+  badge.textContent = nowPK ? 'PK' : nowFK ? 'FK' : '·';
+  badge.title = nowPK ? 'Primary Key — click to set FK' : nowFK ? 'Foreign Key — click to clear' : 'Click to mark as PK';
+}
+
+// ─── Port interaction (event delegation on canvas, capture phase) ──────
+canvas.addEventListener('mousedown', e => {
+  const port = e.target.closest('.port');
+  if (!port) return;
+  e.stopPropagation();
+  e.preventDefault();
+
+  const tableId  = port.dataset.tableId;
+  const colIndex = parseInt(port.dataset.colIndex, 10);
+
+  if (!state.connecting) {
+    // Start connection
+    state.connecting = { tableId, colIndex };
+    port.classList.add('active-port');
+    document.getElementById(tableId)?.classList.add('connecting-source');
+    showHint(true);
+    renderAllLines();
+  } else {
+    // Already connecting
+    if (state.connecting.tableId === tableId && state.connecting.colIndex === colIndex) {
+      // Same port — cancel
+      cancelConnecting();
+      return;
+    }
+    if (state.connecting.tableId === tableId) {
+      // Same table — cancel and restart on new port
+      cancelConnecting();
+      state.connecting = { tableId, colIndex };
+      port.classList.add('active-port');
+      document.getElementById(tableId)?.classList.add('connecting-source');
+      showHint(true);
+      renderAllLines();
+      return;
+    }
+    // Different table — complete connection
+    state.pending = {
+      fromTable: state.connecting.tableId,
+      fromCol:   state.connecting.colIndex,
+      toTable:   tableId,
+      toCol:     colIndex
+    };
+    const fromTbl = state.tables.find(t => t.id === state.pending.fromTable);
+    const toTbl   = state.tables.find(t => t.id === state.pending.toTable);
+    modalDesc.textContent = `${fromTbl?.name}.${fromTbl?.columns[state.pending.fromCol]} ↔ ${toTbl?.name}.${toTbl?.columns[state.pending.toCol]}`;
+    clearConnectingUI();
+    showModal();
+  }
+}, true);
+
+function cancelConnecting() {
+  clearConnectingUI();
+  state.connecting = null;
+  showHint(false);
+  renderAllLines();
+}
+
+function clearConnectingUI() {
+  document.querySelectorAll('.port.active-port').forEach(p => p.classList.remove('active-port'));
+  document.querySelectorAll('.connecting-source').forEach(c => c.classList.remove('connecting-source'));
+  showHint(false);
+}
+
+function showHint(visible) {
+  hintBar.classList.toggle('visible', visible);
+}
+
+// ─── Drag ─────────────────────────────────────────────────────────────
+function startDrag(e, tableId) {
+  if (state.connecting) return; // don't drag while connecting
+  const card = document.getElementById(tableId);
+  const canvasRect = canvas.getBoundingClientRect();
+  state.dragging = {
+    tableId,
+    offsetX: e.clientX - canvasRect.left - parseInt(card.style.left),
+    offsetY: e.clientY - canvasRect.top  - parseInt(card.style.top)
+  };
+  e.preventDefault();
+}
+
+document.addEventListener('mousemove', e => {
+  if (state.dragging) {
+    const canvasRect = canvas.getBoundingClientRect();
+    const tbl = state.tables.find(t => t.id === state.dragging.tableId);
+    if (!tbl) return;
+    tbl.x = Math.max(0, e.clientX - canvasRect.left - state.dragging.offsetX);
+    tbl.y = Math.max(0, e.clientY - canvasRect.top  - state.dragging.offsetY);
+    const card = document.getElementById(tbl.id);
+    if (card) { card.style.left = tbl.x + 'px'; card.style.top = tbl.y + 'px'; }
+    renderAllLines();
+  }
+
+  if (state.connecting) {
+    const canvasRect = canvas.getBoundingClientRect();
+    renderAllLines(e.clientX - canvasRect.left, e.clientY - canvasRect.top);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  state.dragging = null;
+});
+
+// ─── Escape cancels connecting ─────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (state.connecting) cancelConnecting();
+    if (modalOverlay.classList.contains('visible')) hideModal();
+  }
+});
+
+// ─── Modal ────────────────────────────────────────────────────────────
+function showModal() {
+  // reset selection
+  document.querySelectorAll('.rel-option').forEach(opt => opt.classList.remove('selected'));
+  document.querySelector('.rel-option:first-child').classList.add('selected');
+  document.querySelector('input[name="rel-type"][value="one-to-one"]').checked = true;
+  state.selectedRelType = 'one-to-one';
+  modalOverlay.classList.add('visible');
+}
+
+function hideModal() {
+  modalOverlay.classList.remove('visible');
+  state.pending = null;
+  state.connecting = null;
+  renderAllLines();
+}
+
+document.querySelectorAll('.rel-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.rel-option').forEach(o => o.classList.remove('selected'));
+    opt.classList.add('selected');
+    state.selectedRelType = opt.querySelector('input').value;
+  });
+});
+
+document.getElementById('modal-cancel').addEventListener('click', hideModal);
+document.getElementById('modal-confirm').addEventListener('click', () => {
+  if (!state.pending) return;
+  const rel = {
+    id: 'rel_' + (state.nextId++),
+    fromTable: state.pending.fromTable,
+    fromCol:   state.pending.fromCol,
+    toTable:   state.pending.toTable,
+    toCol:     state.pending.toCol,
+    type:      state.selectedRelType
+  };
+  state.relationships.push(rel);
+  hideModal();
+  renderRelations();
+  renderAllLines();
+  // Switch to relations tab briefly
+  document.querySelector('[data-tab="relations"]').click();
+});
+
+modalOverlay.addEventListener('click', e => {
+  if (e.target === modalOverlay) hideModal();
+});
+
+// ─── File upload ──────────────────────────────────────────────────────
+fileInput.addEventListener('change', e => {
+  Array.from(e.target.files).forEach(file => {
+    const name = file.name.replace(/\.csv$/i, '');
+    const reader = new FileReader();
+    reader.onload = ev => addTableFromCSV(name, ev.target.result);
+    reader.readAsText(file);
+  });
+  fileInput.value = '';
+});
+
+document.getElementById('upload-zone').addEventListener('click', e => {
+  if (e.target === fileInput) return; // avoid loop
+  fileInput.click();
+});
+
+// Drag-over to canvas
+document.getElementById('upload-zone').addEventListener('dragover', e => e.preventDefault());
+document.getElementById('upload-zone').addEventListener('drop', e => {
+  e.preventDefault();
+  Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.csv')).forEach(file => {
+    const name = file.name.replace(/\.csv$/i, '');
+    const reader = new FileReader();
+    reader.onload = ev => addTableFromCSV(name, ev.target.result);
+    reader.readAsText(file);
+  });
+});
+
+// ─── Sample Data helpers ───────────────────────────────────────────────
+// Adds tables to the canvas WITHOUT clearing existing work.
+// Returns a map of name→id so callers can wire relationships.
+function addSampleTables(samples) {
+  const idMap = {};
+  // Find a safe starting position that doesn't overlap existing tables
+  const startX = state.tables.length ? Math.max(...state.tables.map(t => t.x + 240)) + 40 : 20;
+  samples.forEach((s, i) => {
+    const id = 'tbl_' + (state.nextId++);
+    const x = s.x !== undefined ? s.x + startX : startX + (i % 3) * 240;
+    const y = s.y !== undefined ? s.y : 20 + Math.floor(i / 3) * 240;
+    state.tables.push({ id, name: s.name, columns: s.columns, x, y,
+      pkCols: s.pkCols ?? [0], fkCols: s.fkCols ?? [] });
+    renderTable(state.tables[state.tables.length - 1]);
+    idMap[s.name] = id;
+  });
+  renderSidebarTables();
+  return idMap;
+}
+
+function wireRels(idMap, rels) {
+  rels.forEach(([fromName, fromColName, toName, toColName, type]) => {
+    const ft = state.tables.find(t => t.id === idMap[fromName]);
+    const tt = state.tables.find(t => t.id === idMap[toName]);
+    if (!ft || !tt) return;
+    const fc = ft.columns.indexOf(fromColName);
+    const tc = tt.columns.indexOf(toColName);
+    if (fc < 0 || tc < 0) return;
+    state.relationships.push({
+      id: 'rel_' + (state.nextId++),
+      fromTable: ft.id, fromCol: fc,
+      toTable: tt.id, toCol: tc, type
+    });
+  });
+}
+
+// ─── 1NF Sample: atomic values & no repeating groups ──────────────────
+function loadSample1NF() {
+  const idMap = addSampleTables([
+    {
+      name: '❌ Contacts_Bad (1NF)',
+      columns: ['ContactID','FullName','PhoneNumbers','Emails'],
+      pkCols: [0], fkCols: [],
+      x: 0, y: 0
+    },
+    {
+      name: '✅ Contacts_1NF',
+      columns: ['ContactID','FirstName','LastName'],
+      pkCols: [0], fkCols: [],
+      x: 0, y: 200
+    },
+    {
+      name: '✅ ContactPhones_1NF',
+      columns: ['ContactID','PhoneNumber','PhoneType'],
+      pkCols: [0, 1], fkCols: [0],
+      x: 260, y: 200
+    },
+    {
+      name: '✅ ContactEmails_1NF',
+      columns: ['ContactID','EmailAddress','EmailType'],
+      pkCols: [0, 1], fkCols: [0],
+      x: 520, y: 200
+    }
+  ]);
+  setTimeout(() => {
+    wireRels(idMap, [
+      ['✅ Contacts_1NF', 'ContactID', '✅ ContactPhones_1NF', 'ContactID', 'one-to-many'],
+      ['✅ Contacts_1NF', 'ContactID', '✅ ContactEmails_1NF', 'ContactID', 'one-to-many']
+    ]);
+    renderRelations();
+    renderAllLines();
+  }, 80);
+}
+
+// ─── 2NF Sample: no partial dependencies ──────────────────────────────
+function loadSample2NF() {
+  const idMap = addSampleTables([
+    {
+      name: '❌ Enrollments_Bad (2NF)',
+      columns: ['StudentID','CourseID','StudentName','CourseName','InstructorName','Grade'],
+      pkCols: [0, 1], fkCols: [],
+      x: 0, y: 0
+    },
+    {
+      name: '✅ Students_2NF',
+      columns: ['StudentID','StudentName','Email'],
+      pkCols: [0], fkCols: [],
+      x: 0, y: 220
+    },
+    {
+      name: '✅ Courses_2NF',
+      columns: ['CourseID','CourseName','InstructorName'],
+      pkCols: [0], fkCols: [],
+      x: 260, y: 220
+    },
+    {
+      name: '✅ Enrollments_2NF',
+      columns: ['StudentID','CourseID','Grade'],
+      pkCols: [0, 1], fkCols: [0, 1],
+      x: 520, y: 220
+    }
+  ]);
+  setTimeout(() => {
+    wireRels(idMap, [
+      ['✅ Students_2NF',    'StudentID', '✅ Enrollments_2NF', 'StudentID', 'one-to-many'],
+      ['✅ Courses_2NF',     'CourseID',  '✅ Enrollments_2NF', 'CourseID',  'one-to-many']
+    ]);
+    renderRelations();
+    renderAllLines();
+  }, 80);
+}
+
+// ─── 3NF Sample: no transitive dependencies ────────────────────────────
+function loadSample3NF() {
+  const idMap = addSampleTables([
+    {
+      name: '❌ Employees_Bad (3NF)',
+      columns: ['EmployeeID','EmployeeName','DeptID','DeptName','DeptLocation'],
+      pkCols: [0], fkCols: [2],
+      x: 0, y: 0
+    },
+    {
+      name: '✅ Employees_3NF',
+      columns: ['EmployeeID','EmployeeName','DeptID'],
+      pkCols: [0], fkCols: [2],
+      x: 0, y: 220
+    },
+    {
+      name: '✅ Departments_3NF',
+      columns: ['DeptID','DeptName','DeptLocation'],
+      pkCols: [0], fkCols: [],
+      x: 280, y: 220
+    }
+  ]);
+  setTimeout(() => {
+    wireRels(idMap, [
+      ['✅ Employees_3NF', 'DeptID', '✅ Departments_3NF', 'DeptID', 'one-to-many']
+    ]);
+    renderRelations();
+    renderAllLines();
+  }, 80);
+}
+
+// ─── Normalization Evaluation Engine ──────────────────────────────────
+document.getElementById('btn-evaluate').addEventListener('click', runEvaluation);
+
+function findRepeatingGroups(columns) {
+  const groups = {};
+  columns.forEach(col => {
+    const m = col.match(/^(.+?)(\d+)$/);
+    if (m && m[1].length >= 2) {
+      groups[m[1]] = groups[m[1]] || [];
+      groups[m[1]].push(col);
+    }
+  });
+  return Object.values(groups).filter(g => g.length >= 2).map(g => g.join(' / '));
+}
+
+function nfBadgeColor(nf) {
+  return nf === '1NF' ? '#6366f1' : nf === '2NF' ? '#0ea5e9' : nf === '3NF' ? '#10b981' : '#94a3b8';
+}
+
+function runEvaluation() {
+  const resultsEl = document.getElementById('eval-results');
+  if (!state.tables.length) {
+    resultsEl.innerHTML = '<div class="eval-empty">No tables to evaluate yet.</div>';
+    return;
+  }
+
+  let totalChecks = 0, totalPasses = 0;
+  let html = '';
+
+  state.tables.forEach(tbl => {
+    const pkCols = tbl.pkCols || [];
+    const fkCols = tbl.fkCols || [];
+    const checks = []; // { nf, pass, warn, msg }
+
+    // ── 1NF ──────────────────────────────────────────────────
+    // 1. Primary key defined?
+    if (pkCols.length === 0) {
+      checks.push({ nf: '1NF', pass: false,
+        msg: 'No primary key defined — every table needs a unique row identifier.' });
+    } else {
+      checks.push({ nf: '1NF', pass: true,
+        msg: `Primary key: ${pkCols.map(i => tbl.columns[i]).join(', ')}` });
+    }
+
+    // 2. Repeating groups (Phone1, Phone2, …)?
+    const repGroups = findRepeatingGroups(tbl.columns);
+    if (repGroups.length) {
+      checks.push({ nf: '1NF', pass: false,
+        msg: `Repeating column groups detected: ${repGroups.join('; ')}\n→ Extract to a child table with a FK back to this one.` });
+    } else {
+      checks.push({ nf: '1NF', pass: true, msg: 'No repeating column groups detected.' });
+    }
+
+    // 3. Multi-value column name hints?
+    const multiVal = tbl.columns.filter(c => /\b(list|csv|array|multi|multiple|values)\b/i.test(c));
+    if (multiVal.length) {
+      checks.push({ nf: '1NF', pass: false, warn: true,
+        msg: `Column name suggests multi-value data: ${multiVal.join(', ')}\n→ Ensure each cell holds a single atomic value.` });
+    }
+
+    // ── 2NF ──────────────────────────────────────────────────
+    if (pkCols.length > 1) {
+      const pkNames = pkCols.map(i => tbl.columns[i]);
+      const nonKeyCols = tbl.columns.filter((_, i) => !pkCols.includes(i));
+      const partialDeps = [];
+      pkNames.forEach(pkCol => {
+        const prefix = pkCol.replace(/(ID|_id|Id)$/i, '').toLowerCase();
+        if (prefix.length < 3) return;
+        nonKeyCols.forEach(col => {
+          if (col.toLowerCase() !== pkCol.toLowerCase() && col.toLowerCase().startsWith(prefix)) {
+            partialDeps.push(`"${col}" may depend only on "${pkCol}"`);
+          }
+        });
+      });
+      if (partialDeps.length) {
+        checks.push({ nf: '2NF', pass: false,
+          msg: `Possible partial dependencies (composite PK [${pkNames.join(', ')}]):\n• ${partialDeps.join('\n• ')}\n→ Move these columns to a table keyed on just that part of the PK.` });
+      } else {
+        checks.push({ nf: '2NF', pass: true,
+          msg: `Composite PK [${pkNames.join(', ')}] — no obvious partial dependencies found.` });
+      }
+    } else {
+      checks.push({ nf: '2NF', pass: true,
+        msg: 'Single-column PK — partial dependencies are not applicable.' });
+    }
+
+    // ── 3NF ──────────────────────────────────────────────────
+    const nonKeyNonFk = tbl.columns.filter((_, i) => !pkCols.includes(i) && !fkCols.includes(i));
+    const transitiveDeps = [];
+    fkCols.forEach(fkIdx => {
+      const fkCol = tbl.columns[fkIdx];
+      const prefix = fkCol.replace(/(ID|_id|Id)$/i, '').toLowerCase();
+      if (prefix.length < 3) return;
+      const deps = nonKeyNonFk.filter(c => c.toLowerCase().startsWith(prefix));
+      if (deps.length) {
+        transitiveDeps.push(`${deps.map(d => '"' + d + '"').join(', ')} depend on "${fkCol}", not the PK`);
+      }
+    });
+    if (transitiveDeps.length) {
+      checks.push({ nf: '3NF', pass: false,
+        msg: `Possible transitive dependencies:\n• ${transitiveDeps.join('\n• ')}\n→ Move these columns to the table referenced by the FK.` });
+    } else {
+      checks.push({ nf: '3NF', pass: true, msg: 'No transitive dependencies detected.' });
+    }
+
+    // ── Relationship checks ───────────────────────────────────
+    // FK columns without a drawn relationship
+    const orphanFKs = fkCols.filter(fkIdx =>
+      !state.relationships.some(r =>
+        (r.fromTable === tbl.id && r.fromCol === fkIdx) ||
+        (r.toTable   === tbl.id && r.toCol   === fkIdx)
+      )
+    );
+    if (orphanFKs.length) {
+      checks.push({ nf: 'REL', pass: false, warn: true,
+        msg: `FK column(s) have no drawn relationship: ${orphanFKs.map(i => tbl.columns[i]).join(', ')}\n→ Draw a relationship line from this FK to the referenced PK.` });
+    }
+    // Relationships pointing to non-PK columns
+    state.relationships.forEach(rel => {
+      if (rel.fromTable !== tbl.id && rel.toTable !== tbl.id) return;
+      const targetTbl  = rel.toTable === tbl.id ? tbl : state.tables.find(t => t.id === rel.toTable);
+      const targetCol  = rel.toTable === tbl.id ? rel.toCol : rel.fromCol;
+      if (!targetTbl) return;
+      const targetPKs  = targetTbl.pkCols || [];
+      if (targetPKs.length > 0 && !targetPKs.includes(targetCol)) {
+        checks.push({ nf: 'REL', pass: false, warn: true,
+          msg: `Relationship targets "${targetTbl.columns[targetCol]}" in "${targetTbl.name}" which is not marked as a PK.` });
+      }
+    });
+
+    // ── Tally & render ────────────────────────────────────────
+    const passes  = checks.filter(c => c.pass).length;
+    const fails   = checks.filter(c => !c.pass && !c.warn).length;
+    const warns   = checks.filter(c => !c.pass && c.warn).length;
+    totalChecks  += checks.length;
+    totalPasses  += passes;
+
+    const headerCls = fails > 0 ? 'fail' : warns > 0 ? 'warn' : 'pass';
+    const headerIcon = fails > 0 ? '❌' : warns > 0 ? '⚠️' : '✅';
+
+    html += `<div class="eval-table">
+      <div class="eval-table-header ${headerCls}">
+        <span>${headerIcon} ${escHtml(tbl.name)}</span>
+        <span class="eval-score">${passes}/${checks.length} passed</span>
+      </div>
+      <div class="eval-items">`;
+
+    checks.forEach(c => {
+      const cls  = c.pass ? 'pass' : c.warn ? 'warn' : 'fail';
+      const icon = c.pass ? '✓' : c.warn ? '⚠' : '✗';
+      html += `<div class="eval-item ${cls}">
+        <span class="eval-nf-badge" style="background:${nfBadgeColor(c.nf)}">${c.nf}</span>
+        <span class="eval-msg">${icon} ${escHtml(c.msg)}</span>
+      </div>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  // Overall summary
+  const pct = Math.round(totalPasses / totalChecks * 100) || 0;
+  const summaryIcon = pct === 100 ? '🏆' : pct >= 70 ? '👍' : '📝';
+  const summaryHtml = `<div class="eval-summary">
+    ${summaryIcon} <strong>${pct}%</strong> checks passed (${totalPasses}/${totalChecks})
+    <br><span style="font-size:10px;color:#64748b">across ${state.tables.length} table${state.tables.length !== 1 ? 's' : ''} · ${state.relationships.length} relationship${state.relationships.length !== 1 ? 's' : ''}</span>
+  </div>`;
+
+  resultsEl.innerHTML = summaryHtml + html;
+}
+
+// ─── Resize observer ──────────────────────────────────────────────────
+const ro = new ResizeObserver(() => renderAllLines());
+ro.observe(canvas);
+
+// ─── Init ─────────────────────────────────────────────────────────────
+renderSidebarTables();
+renderRelations();
+</script>
+</body>
+</html>
