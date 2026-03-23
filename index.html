@@ -284,7 +284,6 @@
     background-color: #f8fafc;
     background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
     background-size: 24px 24px;
-    overflow: hidden;
   }
   #canvas-inner {
     position: absolute;
@@ -1078,8 +1077,8 @@ function typeShortLabel(type) {
 
 function renderAllLines(mouseX, mouseY) {
   // Resize SVG to canvas
-  svgOverlay.setAttribute('width',  canvas.offsetWidth);
-  svgOverlay.setAttribute('height', canvas.offsetHeight);
+  svgOverlay.setAttribute('width',  canvas.offsetWidth  / state.zoom);
+  svgOverlay.setAttribute('height', canvas.offsetHeight / state.zoom);
   svgOverlay.innerHTML = '';
 
   // Build a map of port → [relIds] so we can fan out stacked lines
@@ -1539,8 +1538,8 @@ document.addEventListener('mousemove', e => {
     const tbl = state.tables.find(t => t.id === state.dragging.tableId);
     if (!tbl) return;
     const card = document.getElementById(tbl.id);
-    const maxX = canvas.offsetWidth  - (card?.offsetWidth  ?? 200);
-    const maxY = canvas.offsetHeight - (card?.offsetHeight ?? 150);
+    const maxX = canvas.offsetWidth  / state.zoom - (card?.offsetWidth  ?? 200);
+    const maxY = canvas.offsetHeight / state.zoom - (card?.offsetHeight ?? 150);
     tbl.x = Math.max(0, Math.min(maxX, (e.clientX - canvasRect.left) / state.zoom - state.dragging.offsetX));
     tbl.y = Math.max(0, Math.min(maxY, (e.clientY - canvasRect.top)  / state.zoom - state.dragging.offsetY));
     if (card) { card.style.left = tbl.x + 'px'; card.style.top = tbl.y + 'px'; }
