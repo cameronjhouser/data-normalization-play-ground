@@ -157,6 +157,65 @@
   }
   .nf-example strong { color: #4f46e5; }
 
+  /* Table color picker */
+  .tc-color-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+    opacity: 0.6;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .tc-color-btn:hover { opacity: 1; }
+  .color-picker-popup {
+    position: fixed;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.15);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    align-items: center;
+    z-index: 9999;
+    max-width: 180px;
+  }
+  .color-swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform .12s, box-shadow .12s;
+  }
+  .color-swatch:hover { transform: scale(1.25); box-shadow: 0 0 0 2px rgba(0,0,0,.2); }
+  .color-swatch.active { border-color: #1e293b; }
+  .color-picker-custom { width: 24px; height: 24px; border-radius: 50%; border: 2px dashed #cbd5e1; cursor: pointer; padding: 0; background: none; }
+
+  /* Crow's foot notation per-relationship controls */
+  .notation-section { margin-top: 8px; border-top: 1px solid #f1f5f9; padding-top: 7px; display: flex; flex-direction: column; gap: 5px; }
+  .notation-row { display: flex; align-items: center; gap: 6px; }
+  .notation-label { font-size: 11px; color: #64748b; width: 46px; flex-shrink: 0; font-weight: 600; }
+  .notation-btns { display: flex; gap: 3px; flex-wrap: wrap; }
+  .notation-btn {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background: #f8fafc;
+    cursor: pointer;
+    color: #475569;
+    transition: background .1s, color .1s, border-color .1s;
+    line-height: 1.4;
+  }
+  .notation-btn:hover { background: #eef2ff; color: #4f46e5; border-color: #c7d2fe; }
+  .notation-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
   /* Relations tab */
   .rel-list { display: flex; flex-direction: column; gap: 6px; }
   .rel-item {
@@ -780,7 +839,7 @@ function addTableFromCSV(name, csvText) {
   const margin = 24;
   const x = margin + (state.tables.length % 4) * 240;
   const y = margin + Math.floor(state.tables.length / 4) * 260;
-  state.tables.push({ id, name, columns, x, y, pkCols: [0], fkCols: [] });
+  state.tables.push({ id, name, columns, x, y, pkCols: [0], fkCols: [], color: '#4f46e5' });
   renderTable(state.tables[state.tables.length - 1]);
   renderSidebarTables();
 }
@@ -798,7 +857,8 @@ function renderTable(tbl) {
 
   const header = document.createElement('div');
   header.className = 'table-card-header';
-  header.innerHTML = `<span class="tc-icon">⊞</span>${escHtml(tbl.name)}`;
+  header.style.background = tbl.color || '#4f46e5';
+  header.innerHTML = `<span class="tc-icon">⊞</span><span class="tc-name">${escHtml(tbl.name)}</span><button class="tc-color-btn" data-table-id="${tbl.id}" title="Change table color">🎨</button>`;
   header.onmousedown = e => startDrag(e, tbl.id);
   card.appendChild(header);
 
@@ -872,6 +932,21 @@ function relTypeLabel(type) {
   return { cls: 'tmn', label: 'M:N' };
 }
 
+const NOTATION_OPTIONS = [
+  { val: 'none',             label: '—'    },
+  { val: 'zero-or-one',      label: '0..1' },
+  { val: 'one-and-only-one', label: '1'    },
+  { val: 'zero-or-many',     label: '0..*' },
+  { val: 'one-or-many',      label: '1..*' },
+];
+
+function notationBtns(relId, end, current) {
+  return NOTATION_OPTIONS.map(o =>
+    `<button class="notation-btn${o.val === current ? ' active' : ''}"
+      data-rel-id="${relId}" data-end="${end}" data-val="${o.val}">${o.label}</button>`
+  ).join('');
+}
+
 function renderRelations() {
   if (!state.relationships.length) {
     relList.innerHTML = '<div class="rel-empty">No relationships yet.<br>Click ports to connect columns.</div>';
@@ -885,6 +960,8 @@ function renderRelations() {
     const fromCol = fromTbl.columns[rel.fromCol];
     const toCol   = toTbl.columns[rel.toCol];
     const { cls, label } = relTypeLabel(rel.type);
+    const fn = rel.fromNotation || 'none';
+    const tn = rel.toNotation   || 'none';
     const item = document.createElement('div');
     item.className = 'rel-item';
     item.innerHTML = `
@@ -893,17 +970,40 @@ function renderRelations() {
         <span class="rel-badge ${cls}">${label}</span>
         <button class="rel-del" data-del-rel="${rel.id}" title="Delete">✕</button>
       </div>
+      <div class="notation-section">
+        <div class="notation-row">
+          <span class="notation-label">↗ From</span>
+          <div class="notation-btns">${notationBtns(rel.id, 'from', fn)}</div>
+        </div>
+        <div class="notation-row">
+          <span class="notation-label">↘ To</span>
+          <div class="notation-btns">${notationBtns(rel.id, 'to', tn)}</div>
+        </div>
+      </div>
     `;
     relList.appendChild(item);
   });
 }
 
 relList.addEventListener('click', e => {
-  const btn = e.target.closest('[data-del-rel]');
-  if (!btn) return;
-  state.relationships = state.relationships.filter(r => r.id !== btn.dataset.delRel);
-  renderRelations();
-  renderAllLines();
+  const delBtn = e.target.closest('[data-del-rel]');
+  if (delBtn) {
+    state.relationships = state.relationships.filter(r => r.id !== delBtn.dataset.delRel);
+    renderRelations();
+    renderAllLines();
+    return;
+  }
+  const notBtn = e.target.closest('.notation-btn');
+  if (notBtn) {
+    const rel = state.relationships.find(r => r.id === notBtn.dataset.relId);
+    if (!rel) return;
+    if (notBtn.dataset.end === 'from') rel.fromNotation = notBtn.dataset.val;
+    else                               rel.toNotation   = notBtn.dataset.val;
+    // Update active state on buttons in same group
+    notBtn.closest('.notation-btns').querySelectorAll('.notation-btn').forEach(b => b.classList.remove('active'));
+    notBtn.classList.add('active');
+    renderAllLines();
+  }
 });
 
 // ─── Get port center relative to canvas ───────────────────────────────
@@ -991,6 +1091,13 @@ function drawLine(p1, p2, type, relId) {
   path.setAttribute('opacity', '0.85');
   if (isDash) path.setAttribute('stroke-dasharray', '7 4');
   g.appendChild(path);
+
+  // Per-relationship crow's foot markers
+  const relData = state.relationships.find(r => r.id === relId);
+  if (relData) {
+    drawNotationMarker(g, p1.x, p1.y, +1, relData.fromNotation, stroke);
+    drawNotationMarker(g, p2.x, p2.y, -1, relData.toNotation,   stroke);
+  }
 
   // Midpoint for badge
   const mx = (p1.x + p2.x) / 2;
@@ -1092,6 +1199,111 @@ function cycleKeyBadge(tableId, colIndex) {
   badge.className = 'key-badge ' + (nowPK ? 'key-pk' : nowFK ? 'key-fk' : 'key-none');
   badge.textContent = nowPK ? 'PK' : nowFK ? 'FK' : '·';
   badge.title = nowPK ? 'Primary Key — click to set FK' : nowFK ? 'Foreign Key — click to clear' : 'Click to mark as PK';
+}
+
+// ─── Table color picker ────────────────────────────────────────────────
+const COLOR_PALETTE = ['#4f46e5','#0ea5e9','#10b981','#f43f5e','#f97316','#7c3aed','#0d9488','#475569','#b45309','#db2777'];
+
+canvas.addEventListener('click', e => {
+  const btn = e.target.closest('.tc-color-btn');
+  if (!btn) return;
+  e.stopPropagation();
+  showColorPicker(btn.dataset.tableId, btn);
+}, true);
+
+function showColorPicker(tableId, anchor) {
+  document.querySelectorAll('.color-picker-popup').forEach(el => el.remove());
+  const tbl = state.tables.find(t => t.id === tableId);
+  const current = tbl?.color || '#4f46e5';
+
+  const popup = document.createElement('div');
+  popup.className = 'color-picker-popup';
+
+  COLOR_PALETTE.forEach(color => {
+    const sw = document.createElement('button');
+    sw.className = 'color-swatch' + (color === current ? ' active' : '');
+    sw.style.background = color;
+    sw.title = color;
+    sw.addEventListener('click', e => { e.stopPropagation(); setTableColor(tableId, color); popup.remove(); });
+    popup.appendChild(sw);
+  });
+
+  const customInput = document.createElement('input');
+  customInput.type = 'color';
+  customInput.value = current;
+  customInput.className = 'color-picker-custom';
+  customInput.title = 'Custom color';
+  customInput.addEventListener('input', e => setTableColor(tableId, e.target.value));
+  customInput.addEventListener('change', () => popup.remove());
+  popup.appendChild(customInput);
+
+  const rect = anchor.getBoundingClientRect();
+  popup.style.top  = (rect.bottom + 6) + 'px';
+  popup.style.left = Math.min(rect.left, window.innerWidth - 200) + 'px';
+  document.body.appendChild(popup);
+
+  setTimeout(() => document.addEventListener('click', () => popup.remove(), { once: true }), 0);
+}
+
+function setTableColor(tableId, color) {
+  const tbl = state.tables.find(t => t.id === tableId);
+  if (!tbl) return;
+  tbl.color = color;
+  const header = document.querySelector(`#${tableId} .table-card-header`);
+  if (header) header.style.background = color;
+}
+
+// ─── Crow's foot SVG helpers ───────────────────────────────────────────
+function svgLine(g, x1, y1, x2, y2, stroke, sw) {
+  const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  ln.setAttribute('x1', x1); ln.setAttribute('y1', y1);
+  ln.setAttribute('x2', x2); ln.setAttribute('y2', y2);
+  ln.setAttribute('stroke', stroke); ln.setAttribute('stroke-width', sw || '2');
+  g.appendChild(ln);
+}
+
+// Draw a crow's foot notation marker at endpoint (x,y).
+// dir: +1 = entity at x, marks extend rightward; -1 = marks extend leftward.
+// Layout from entity outward: [entity] [optionality @+8] [multiplicity @+18]
+function drawNotationMarker(g, x, y, dir, notation, stroke) {
+  if (!notation || notation === 'none') return;
+  const ix  = x + dir * 11;  // inner: optionality (bar or circle)
+  const ox  = x + dir * 24;  // outer: multiplicity (bar or crow's foot)
+  const sz  = 9;              // half-height of marks
+  const ink = '#1e293b';      // always dark so markers contrast against any line colour
+
+  // ── White knockout rect so markers pop off the line ─────────
+  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  bg.setAttribute('x',      dir > 0 ? x + 1       : ox - 2);
+  bg.setAttribute('y',      y - sz - 3);
+  bg.setAttribute('width',  Math.abs(ox - x) + 2);
+  bg.setAttribute('height', (sz + 3) * 2);
+  bg.setAttribute('fill',   '#fff');
+  bg.setAttribute('opacity','0.92');
+  g.appendChild(bg);
+
+  // ── Inner: optionality ──────────────────────────────────────
+  if (notation === 'zero-or-many' || notation === 'zero-or-one') {
+    // Circle = optional / zero allowed
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('cx', ix); c.setAttribute('cy', y); c.setAttribute('r', '5');
+    c.setAttribute('fill', '#fff'); c.setAttribute('stroke', ink); c.setAttribute('stroke-width', '2');
+    g.appendChild(c);
+  } else {
+    // Bar = mandatory
+    svgLine(g, ix, y - sz, ix, y + sz, ink, '2.5');
+  }
+
+  // ── Outer: multiplicity ─────────────────────────────────────
+  if (notation === 'zero-or-many' || notation === 'one-or-many') {
+    // Crow's foot: three spokes from ox spreading toward ix
+    svgLine(g, ox, y,  ix, y,      ink, '2');   // centre spoke
+    svgLine(g, ox, y,  ix, y - sz, ink, '2');   // upper spoke
+    svgLine(g, ox, y,  ix, y + sz, ink, '2');   // lower spoke
+  } else {
+    // Single bar = one
+    svgLine(g, ox, y - sz, ox, y + sz, ink, '2.5');
+  }
 }
 
 // ─── Port interaction (event delegation on canvas, capture phase) ──────
@@ -1237,7 +1449,9 @@ document.getElementById('modal-confirm').addEventListener('click', () => {
     fromCol:   state.pending.fromCol,
     toTable:   state.pending.toTable,
     toCol:     state.pending.toCol,
-    type:      state.selectedRelType
+    type:      state.selectedRelType,
+    fromNotation: 'none',
+    toNotation:   'none'
   };
   state.relationships.push(rel);
   hideModal();
@@ -1310,7 +1524,8 @@ function wireRels(idMap, rels) {
     state.relationships.push({
       id: 'rel_' + (state.nextId++),
       fromTable: ft.id, fromCol: fc,
-      toTable: tt.id, toCol: tc, type
+      toTable: tt.id, toCol: tc, type,
+      fromNotation: 'none', toNotation: 'none'
     });
   });
 }
