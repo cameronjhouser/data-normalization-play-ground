@@ -358,7 +358,7 @@
   }
   @keyframes modalIn {
     from { transform: translateY(-12px) scale(.97); opacity: 0; }
-    to   { transform: translateY(0) scale(1); opacity: 1; }
+    to   { transform: translateY(0) scale(1); opacity: 0; }
   }
   #modal h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #1e293b; }
   #modal p  { font-size: 12px; color: #64748b; margin-bottom: 18px; }
@@ -1075,16 +1075,11 @@ function renderAllLines(mouseX, mouseY) {
   // Pass 1 — all bezier lines + badges
   lineData.forEach(({ rel, p1, p2 }) => drawLine(p1, p2, rel.type, rel.id));
 
-  // Pass 2 — all white knockout rects (on top of every line)
+  // Pass 2 — all notation symbols in line color (on top of every line)
   lineData.forEach(({ rel, p1, p2 }) => {
-    drawNotationBg(p1.x, p1.y, +1, rel.fromNotation);
-    drawNotationBg(p2.x, p2.y, -1, rel.toNotation);
-  });
-
-  // Pass 3 — all notation symbols (on top of every background)
-  lineData.forEach(({ rel, p1, p2 }) => {
-    drawNotationSymbols(p1.x, p1.y, +1, rel.fromNotation);
-    drawNotationSymbols(p2.x, p2.y, -1, rel.toNotation);
+    const { stroke } = typeColors(rel.type);
+    drawNotationSymbols(p1.x, p1.y, +1, rel.fromNotation, stroke);
+    drawNotationSymbols(p2.x, p2.y, -1, rel.toNotation,   stroke);
   });
 
   // Rubber band
@@ -1295,42 +1290,26 @@ function svgLine(g, x1, y1, x2, y2, stroke, sw) {
   g.appendChild(ln);
 }
 
-// Draw a crow's foot notation marker at endpoint (x,y).
-// dir: +1 = entity at x, marks extend rightward; -1 = marks extend leftward.
-// Layout from entity outward: [entity] [optionality @+8] [multiplicity @+18]
-// Pass 2 — white knockout rect only (drawn after all lines, before symbols)
-function drawNotationBg(x, y, dir, notation) {
+// Draw crow's foot notation symbols at endpoint (x,y) in the line's own color.
+// dir: +1 = marks extend rightward from entity; -1 = marks extend leftward.
+// Layout from entity outward: [port] gap [optionality @+16] [multiplicity @+30]
+function drawNotationSymbols(x, y, dir, notation, ink) {
   if (!notation || notation === 'none') return;
-  const ox = x + dir * 24;
-  const sz = 9;
-  const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x',      dir > 0 ? x + 1 : ox - 2);
-  bg.setAttribute('y',      y - sz - 3);
-  bg.setAttribute('width',  Math.abs(ox - x) + 2);
-  bg.setAttribute('height', (sz + 3) * 2);
-  bg.setAttribute('fill',   '#fff');
-  svgOverlay.appendChild(bg);
-}
+  const ix = x + dir * 16;   // inner: optionality (clear of the 6px port circle)
+  const ox = x + dir * 30;   // outer: multiplicity
+  const sz = 9;               // half-height of marks
 
-// Pass 3 — marker symbols only (drawn after all backgrounds)
-function drawNotationSymbols(x, y, dir, notation) {
-  if (!notation || notation === 'none') return;
-  const ix  = x + dir * 11;
-  const ox  = x + dir * 24;
-  const sz  = 9;
-  const ink = '#1e293b';
-
-  // Inner: optionality
+  // Inner: optionality — circle = zero/optional, bar = mandatory
   if (notation === 'zero-or-many' || notation === 'zero-or-one') {
     const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     c.setAttribute('cx', ix); c.setAttribute('cy', y); c.setAttribute('r', '5');
-    c.setAttribute('fill', '#fff'); c.setAttribute('stroke', ink); c.setAttribute('stroke-width', '2');
+    c.setAttribute('fill', '#f8fafc'); c.setAttribute('stroke', ink); c.setAttribute('stroke-width', '2');
     svgOverlay.appendChild(c);
   } else {
     svgLine(svgOverlay, ix, y - sz, ix, y + sz, ink, '2.5');
   }
 
-  // Outer: multiplicity
+  // Outer: multiplicity — crow's foot = many, bar = one
   if (notation === 'zero-or-many' || notation === 'one-or-many') {
     svgLine(svgOverlay, ox, y,  ix, y,      ink, '2');
     svgLine(svgOverlay, ox, y,  ix, y - sz, ink, '2');
