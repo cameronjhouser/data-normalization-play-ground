@@ -238,6 +238,12 @@
   .rel-badge.t11 { background: #4f46e5; }
   .rel-badge.t1n { background: #16a34a; }
   .rel-badge.tmn { background: #db2777; }
+  .rel-color-btn {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 2px solid rgba(0,0,0,0.2); cursor: pointer;
+    padding: 0; flex-shrink: 0; transition: transform .15s;
+  }
+  .rel-color-btn:hover { transform: scale(1.25); }
   .rel-del {
     background: none;
     border: none;
@@ -962,12 +968,14 @@ function renderRelations() {
     const { cls, label } = relTypeLabel(rel.type);
     const fn = rel.fromNotation || 'none';
     const tn = rel.toNotation   || 'none';
+    const lineClr = rel.lineColor || typeColors(rel.type).stroke;
     const item = document.createElement('div');
     item.className = 'rel-item';
     item.innerHTML = `
       <div class="rel-path">${escHtml(fromTbl.name)}.<strong>${escHtml(fromCol)}</strong> ↔ ${escHtml(toTbl.name)}.<strong>${escHtml(toCol)}</strong></div>
       <div class="rel-footer">
         <span class="rel-badge ${cls}">${label}</span>
+        <button class="rel-color-btn" data-rel-id="${rel.id}" title="Change line color" style="background:${lineClr}"></button>
         <button class="rel-del" data-del-rel="${rel.id}" title="Delete">✕</button>
       </div>
       <div class="notation-section">
@@ -991,6 +999,12 @@ relList.addEventListener('click', e => {
     state.relationships = state.relationships.filter(r => r.id !== delBtn.dataset.delRel);
     renderRelations();
     renderAllLines();
+    return;
+  }
+  const colorBtn = e.target.closest('.rel-color-btn');
+  if (colorBtn) {
+    e.stopPropagation();
+    showRelColorPicker(colorBtn.dataset.relId, colorBtn);
     return;
   }
   const notBtn = e.target.closest('.notation-btn');
@@ -1073,11 +1087,11 @@ function renderAllLines(mouseX, mouseY) {
   });
 
   // Pass 1 — all bezier lines + badges
-  lineData.forEach(({ rel, p1, p2 }) => drawLine(p1, p2, rel.type, rel.id));
+  lineData.forEach(({ rel, p1, p2 }) => drawLine(p1, p2, rel));
 
   // Pass 2 — all notation symbols in line color (on top of every line)
   lineData.forEach(({ rel, p1, p2 }) => {
-    const { stroke } = typeColors(rel.type);
+    const stroke = rel.lineColor || typeColors(rel.type).stroke;
     drawNotationSymbols(p1.x, p1.y, +1, rel.fromNotation, stroke);
     drawNotationSymbols(p2.x, p2.y, -1, rel.toNotation,   stroke);
   });
@@ -1101,10 +1115,13 @@ function renderAllLines(mouseX, mouseY) {
   }
 }
 
-function drawLine(p1, p2, type, relId) {
-  const { stroke, fill } = typeColors(type);
-  const label = typeShortLabel(type);
-  const isDash = type === 'many-to-many';
+function drawLine(p1, p2, rel) {
+  const base   = typeColors(rel.type);
+  const stroke = rel.lineColor || base.stroke;
+  const fill   = rel.lineColor || base.fill;
+  const relId  = rel.id;
+  const label  = typeShortLabel(rel.type);
+  const isDash = rel.type === 'many-to-many';
   const cp = Math.max(60, Math.abs(p2.x - p1.x) * 0.5);
   const d  = `M ${p1.x} ${p1.y} C ${p1.x + cp} ${p1.y}, ${p2.x - cp} ${p2.y}, ${p2.x} ${p2.y}`;
 
@@ -1279,6 +1296,49 @@ function setTableColor(tableId, color) {
   tbl.color = color;
   const header = document.querySelector(`#${tableId} .table-card-header`);
   if (header) header.style.background = color;
+}
+
+function showRelColorPicker(relId, anchor) {
+  document.querySelectorAll('.color-picker-popup').forEach(el => el.remove());
+  const rel = state.relationships.find(r => r.id === relId);
+  const current = rel?.lineColor || typeColors(rel?.type).stroke;
+
+  const popup = document.createElement('div');
+  popup.className = 'color-picker-popup';
+
+  COLOR_PALETTE.forEach(color => {
+    const sw = document.createElement('button');
+    sw.className = 'color-swatch' + (color === current ? ' active' : '');
+    sw.style.background = color;
+    sw.title = color;
+    sw.addEventListener('click', e => { e.stopPropagation(); setRelColor(relId, color); popup.remove(); });
+    popup.appendChild(sw);
+  });
+
+  const customInput = document.createElement('input');
+  customInput.type = 'color';
+  customInput.value = current;
+  customInput.className = 'color-picker-custom';
+  customInput.title = 'Custom color';
+  customInput.addEventListener('input', e => setRelColor(relId, e.target.value));
+  customInput.addEventListener('change', () => popup.remove());
+  popup.appendChild(customInput);
+
+  const rect = anchor.getBoundingClientRect();
+  popup.style.top  = (rect.bottom + 6) + 'px';
+  popup.style.left = Math.min(rect.left, window.innerWidth - 220) + 'px';
+  document.body.appendChild(popup);
+  setTimeout(() => document.addEventListener('click', () => popup.remove(), { once: true }), 0);
+}
+
+function setRelColor(relId, color) {
+  const rel = state.relationships.find(r => r.id === relId);
+  if (!rel) return;
+  rel.lineColor = color;
+  // Update the swatch button in the sidebar
+  const btn = relList.querySelector(`.rel-color-btn[data-rel-id="${relId}"]`);
+  if (btn) btn.style.background = color;
+  renderAllLines();
 }
 
 // ─── Crow's foot SVG helpers ───────────────────────────────────────────
@@ -1463,6 +1523,7 @@ document.getElementById('modal-confirm').addEventListener('click', () => {
     toTable:   state.pending.toTable,
     toCol:     state.pending.toCol,
     type:      state.selectedRelType,
+    lineColor:    null,
     fromNotation: 'none',
     toNotation:   'none'
   };
@@ -1538,7 +1599,7 @@ function wireRels(idMap, rels) {
       id: 'rel_' + (state.nextId++),
       fromTable: ft.id, fromCol: fc,
       toTable: tt.id, toCol: tc, type,
-      fromNotation: 'none', toNotation: 'none'
+      lineColor: null, fromNotation: 'none', toNotation: 'none'
     });
   });
 }
