@@ -281,11 +281,15 @@
   #canvas {
     position: absolute;
     inset: 0;
-    transform-origin: 0 0;
     background-color: #f8fafc;
     background-image: radial-gradient(circle, #cbd5e1 1px, transparent 1px);
     background-size: 24px 24px;
     overflow: hidden;
+  }
+  #canvas-inner {
+    position: absolute;
+    inset: 0;
+    transform-origin: 0 0;
   }
 
   #svg-overlay {
@@ -750,7 +754,9 @@
 <!-- ── Canvas ─────────────────────────────────────── -->
 <div id="canvas-wrapper">
   <div id="canvas">
-    <svg id="svg-overlay"></svg>
+    <div id="canvas-inner">
+      <svg id="svg-overlay"></svg>
+    </div>
   </div>
   <div id="zoom-controls">
     <button id="zoom-out" title="Zoom out">−</button>
@@ -810,6 +816,7 @@ const state = {
 
 // ─── DOM refs ─────────────────────────────────────────────────────────
 const canvas       = document.getElementById('canvas');
+const canvasInner  = document.getElementById('canvas-inner');
 const svgOverlay   = document.getElementById('svg-overlay');
 const hintBar      = document.getElementById('hint-bar');
 const modalOverlay = document.getElementById('modal-overlay');
@@ -912,7 +919,7 @@ function renderTable(tbl) {
   });
 
   card.appendChild(body);
-  canvas.appendChild(card);
+  canvasInner.appendChild(card);
 }
 
 function escHtml(s) {
@@ -1531,9 +1538,11 @@ document.addEventListener('mousemove', e => {
     const canvasRect = canvas.getBoundingClientRect();
     const tbl = state.tables.find(t => t.id === state.dragging.tableId);
     if (!tbl) return;
-    tbl.x = Math.max(0, (e.clientX - canvasRect.left) / state.zoom - state.dragging.offsetX);
-    tbl.y = Math.max(0, (e.clientY - canvasRect.top)  / state.zoom - state.dragging.offsetY);
     const card = document.getElementById(tbl.id);
+    const maxX = canvas.offsetWidth  - (card?.offsetWidth  ?? 200);
+    const maxY = canvas.offsetHeight - (card?.offsetHeight ?? 150);
+    tbl.x = Math.max(0, Math.min(maxX, (e.clientX - canvasRect.left) / state.zoom - state.dragging.offsetX));
+    tbl.y = Math.max(0, Math.min(maxY, (e.clientY - canvasRect.top)  / state.zoom - state.dragging.offsetY));
     if (card) { card.style.left = tbl.x + 'px'; card.style.top = tbl.y + 'px'; }
     renderAllLines();
   }
@@ -1954,8 +1963,8 @@ function runEvaluation() {
 
 // ─── Zoom ─────────────────────────────────────────────────────────────
 function setZoom(z) {
-  state.zoom = Math.min(2, Math.max(0.25, Math.round(z * 4) / 4)); // snap to 0.25 steps
-  canvas.style.transform = `scale(${state.zoom})`;
+  state.zoom = Math.min(2, Math.max(0.25, Math.round(z * 4) / 4));
+  canvasInner.style.transform = `scale(${state.zoom})`;
   document.getElementById('zoom-label').textContent = Math.round(state.zoom * 100) + '%';
   renderAllLines();
 }
