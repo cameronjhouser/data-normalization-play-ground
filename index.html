@@ -1039,11 +1039,34 @@ function renderAllLines(mouseX, mouseY) {
   svgOverlay.setAttribute('height', canvas.offsetHeight);
   svgOverlay.innerHTML = '';
 
+  // Build a map of port → [relIds] so we can fan out stacked lines
+  const portMap = {};
+  state.relationships.forEach(rel => {
+    const fk = `${rel.fromTable}:${rel.fromCol}`;
+    const tk = `${rel.toTable}:${rel.toCol}`;
+    (portMap[fk] = portMap[fk] || []).push(rel.id);
+    (portMap[tk] = portMap[tk] || []).push(rel.id);
+  });
+
+  const FAN_STEP = 8; // vertical pixels between stacked lines
+
   // Draw saved relationships
   state.relationships.forEach(rel => {
-    const p1 = getPortCenter(rel.fromTable, rel.fromCol);
-    const p2 = getPortCenter(rel.toTable, rel.toCol);
-    if (!p1 || !p2) return;
+    const p1base = getPortCenter(rel.fromTable, rel.fromCol);
+    const p2base = getPortCenter(rel.toTable,   rel.toCol);
+    if (!p1base || !p2base) return;
+
+    // Offset each line at its port so stacked lines fan out vertically
+    const fk    = `${rel.fromTable}:${rel.fromCol}`;
+    const fRels = portMap[fk];
+    const fOff  = fRels.length > 1 ? (fRels.indexOf(rel.id) - (fRels.length - 1) / 2) * FAN_STEP : 0;
+
+    const tk    = `${rel.toTable}:${rel.toCol}`;
+    const tRels = portMap[tk];
+    const tOff  = tRels.length > 1 ? (tRels.indexOf(rel.id) - (tRels.length - 1) / 2) * FAN_STEP : 0;
+
+    const p1 = { x: p1base.x, y: p1base.y + fOff };
+    const p2 = { x: p2base.x, y: p2base.y + tOff };
     drawLine(p1, p2, rel.type, rel.id);
   });
 
