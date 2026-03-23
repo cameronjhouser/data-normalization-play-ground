@@ -1076,9 +1076,16 @@ function typeShortLabel(type) {
 }
 
 function renderAllLines(mouseX, mouseY) {
-  // Resize SVG to canvas
-  svgOverlay.setAttribute('width',  canvas.offsetWidth  / state.zoom);
-  svgOverlay.setAttribute('height', canvas.offsetHeight / state.zoom);
+  // Resize SVG to cover the full logical area including all table positions
+  let svgW = canvas.offsetWidth  / state.zoom;
+  let svgH = canvas.offsetHeight / state.zoom;
+  state.tables.forEach(t => {
+    const card = document.getElementById(t.id);
+    svgW = Math.max(svgW, t.x + (card?.offsetWidth  ?? 200) + 50);
+    svgH = Math.max(svgH, t.y + (card?.offsetHeight ?? 200) + 50);
+  });
+  svgOverlay.setAttribute('width',  svgW);
+  svgOverlay.setAttribute('height', svgH);
   svgOverlay.innerHTML = '';
 
   // Build a map of port → [relIds] so we can fan out stacked lines
