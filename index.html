@@ -1050,14 +1050,14 @@ function renderAllLines(mouseX, mouseY) {
 
   const FAN_STEP = 8; // vertical pixels between stacked lines
 
-  // Draw saved relationships
+  // Pre-compute fanned points once (reused across all 3 passes)
+  const lineData = [];
   state.relationships.forEach(rel => {
     const p1base = getPortCenter(rel.fromTable, rel.fromCol);
     const p2base = getPortCenter(rel.toTable,   rel.toCol);
     if (!p1base || !p2base) return;
 
-    // Offset each line at its port so stacked lines fan out vertically
-    const fk    = `${rel.fromTable}:${rel.fromCol}`;
+    const fk   = `${rel.fromTable}:${rel.fromCol}`;
     const fRels = portMap[fk];
     const fOff  = fRels.length > 1 ? (fRels.indexOf(rel.id) - (fRels.length - 1) / 2) * FAN_STEP : 0;
 
@@ -1065,9 +1065,26 @@ function renderAllLines(mouseX, mouseY) {
     const tRels = portMap[tk];
     const tOff  = tRels.length > 1 ? (tRels.indexOf(rel.id) - (tRels.length - 1) / 2) * FAN_STEP : 0;
 
-    const p1 = { x: p1base.x, y: p1base.y + fOff };
-    const p2 = { x: p2base.x, y: p2base.y + tOff };
-    drawLine(p1, p2, rel.type, rel.id);
+    lineData.push({
+      rel,
+      p1: { x: p1base.x, y: p1base.y + fOff },
+      p2: { x: p2base.x, y: p2base.y + tOff }
+    });
+  });
+
+  // Pass 1 — all bezier lines + badges
+  lineData.forEach(({ rel, p1, p2 }) => drawLine(p1, p2, rel.type, rel.id));
+
+  // Pass 2 — all white knockout rects (on top of every line)
+  lineData.forEach(({ rel, p1, p2 }) => {
+    drawNotationBg(p1.x, p1.y, +1, rel.fromNotation);
+    drawNotationBg(p2.x, p2.y, -1, rel.toNotation);
+  });
+
+  // Pass 3 — all notation symbols (on top of every background)
+  lineData.forEach(({ rel, p1, p2 }) => {
+    drawNotationSymbols(p1.x, p1.y, +1, rel.fromNotation);
+    drawNotationSymbols(p2.x, p2.y, -1, rel.toNotation);
   });
 
   // Rubber band
@@ -1114,13 +1131,6 @@ function drawLine(p1, p2, type, relId) {
   path.setAttribute('opacity', '0.85');
   if (isDash) path.setAttribute('stroke-dasharray', '7 4');
   g.appendChild(path);
-
-  // Per-relationship crow's foot markers
-  const relData = state.relationships.find(r => r.id === relId);
-  if (relData) {
-    drawNotationMarker(g, p1.x, p1.y, +1, relData.fromNotation, stroke);
-    drawNotationMarker(g, p2.x, p2.y, -1, relData.toNotation,   stroke);
-  }
 
   // Midpoint for badge
   const mx = (p1.x + p2.x) / 2;
@@ -1288,44 +1298,45 @@ function svgLine(g, x1, y1, x2, y2, stroke, sw) {
 // Draw a crow's foot notation marker at endpoint (x,y).
 // dir: +1 = entity at x, marks extend rightward; -1 = marks extend leftward.
 // Layout from entity outward: [entity] [optionality @+8] [multiplicity @+18]
-function drawNotationMarker(g, x, y, dir, notation, stroke) {
+// Pass 2 — white knockout rect only (drawn after all lines, before symbols)
+function drawNotationBg(x, y, dir, notation) {
   if (!notation || notation === 'none') return;
-  const ix  = x + dir * 11;  // inner: optionality (bar or circle)
-  const ox  = x + dir * 24;  // outer: multiplicity (bar or crow's foot)
-  const sz  = 9;              // half-height of marks
-  const ink = '#1e293b';      // always dark so markers contrast against any line colour
-
-  // ── White knockout rect so markers pop off the line ─────────
+  const ox = x + dir * 24;
+  const sz = 9;
   const bg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bg.setAttribute('x',      dir > 0 ? x + 1       : ox - 2);
+  bg.setAttribute('x',      dir > 0 ? x + 1 : ox - 2);
   bg.setAttribute('y',      y - sz - 3);
   bg.setAttribute('width',  Math.abs(ox - x) + 2);
   bg.setAttribute('height', (sz + 3) * 2);
   bg.setAttribute('fill',   '#fff');
-  bg.setAttribute('opacity','0.92');
-  g.appendChild(bg);
+  svgOverlay.appendChild(bg);
+}
 
-  // ── Inner: optionality ──────────────────────────────────────
+// Pass 3 — marker symbols only (drawn after all backgrounds)
+function drawNotationSymbols(x, y, dir, notation) {
+  if (!notation || notation === 'none') return;
+  const ix  = x + dir * 11;
+  const ox  = x + dir * 24;
+  const sz  = 9;
+  const ink = '#1e293b';
+
+  // Inner: optionality
   if (notation === 'zero-or-many' || notation === 'zero-or-one') {
-    // Circle = optional / zero allowed
     const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     c.setAttribute('cx', ix); c.setAttribute('cy', y); c.setAttribute('r', '5');
     c.setAttribute('fill', '#fff'); c.setAttribute('stroke', ink); c.setAttribute('stroke-width', '2');
-    g.appendChild(c);
+    svgOverlay.appendChild(c);
   } else {
-    // Bar = mandatory
-    svgLine(g, ix, y - sz, ix, y + sz, ink, '2.5');
+    svgLine(svgOverlay, ix, y - sz, ix, y + sz, ink, '2.5');
   }
 
-  // ── Outer: multiplicity ─────────────────────────────────────
+  // Outer: multiplicity
   if (notation === 'zero-or-many' || notation === 'one-or-many') {
-    // Crow's foot: three spokes from ox spreading toward ix
-    svgLine(g, ox, y,  ix, y,      ink, '2');   // centre spoke
-    svgLine(g, ox, y,  ix, y - sz, ink, '2');   // upper spoke
-    svgLine(g, ox, y,  ix, y + sz, ink, '2');   // lower spoke
+    svgLine(svgOverlay, ox, y,  ix, y,      ink, '2');
+    svgLine(svgOverlay, ox, y,  ix, y - sz, ink, '2');
+    svgLine(svgOverlay, ox, y,  ix, y + sz, ink, '2');
   } else {
-    // Single bar = one
-    svgLine(g, ox, y - sz, ox, y + sz, ink, '2.5');
+    svgLine(svgOverlay, ox, y - sz, ox, y + sz, ink, '2.5');
   }
 }
 
