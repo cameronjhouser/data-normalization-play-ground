@@ -210,6 +210,8 @@
   }
   #zoom-controls button:hover { background: #f1f5f9; }
   #zoom-label { font-size: 13px; font-weight: 600; color: #475569; min-width: 42px; text-align: center; }
+  #zoom-divider { width: 1px; background: #e2e8f0; margin: 2px 6px; align-self: stretch; }
+  #print-btn { font-size: 15px !important; padding: 2px 7px !important; }
 
   /* Crow's foot notation per-relationship controls */
   .notation-section { margin-top: 8px; border-top: 1px solid #f1f5f9; padding-top: 7px; display: flex; flex-direction: column; gap: 5px; }
@@ -588,6 +590,16 @@
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+  /* ── Print / PDF ─────────────────────────────────────────────── */
+  @media print {
+    body { display: block !important; margin: 0; padding: 0; }
+    #sidebar { display: none !important; }
+    #canvas-wrapper { position: fixed !important; inset: 0 !important; width: 100vw !important; height: 100vh !important; }
+    #zoom-controls, #hint-bar, #modal-overlay { display: none !important; }
+    .tc-color-btn, .port { display: none !important; }
+    .table-card { box-shadow: 0 1px 4px rgba(0,0,0,.15) !important; }
+  }
 </style>
 </head>
 <body>
@@ -760,6 +772,8 @@
     <button id="zoom-out" title="Zoom out">−</button>
     <span id="zoom-label">100%</span>
     <button id="zoom-in" title="Zoom in">+</button>
+    <span id="zoom-divider"></span>
+    <button id="print-btn" title="Save as PDF / Print">⎙</button>
   </div>
   <div id="hint-bar">Click a port on another table to complete the connection · Esc to cancel</div>
 </div>
@@ -1976,6 +1990,16 @@ function setZoom(z) {
 
 document.getElementById('zoom-in') .addEventListener('click', () => setZoom(state.zoom + 0.25));
 document.getElementById('zoom-out').addEventListener('click', () => setZoom(state.zoom - 0.25));
+document.getElementById('print-btn').addEventListener('click', () => {
+  const prevZoom = state.zoom;
+  if (state.zoom !== 1) setZoom(1);
+  const afterPrint = () => {
+    setZoom(prevZoom);
+    window.removeEventListener('afterprint', afterPrint);
+  };
+  window.addEventListener('afterprint', afterPrint);
+  window.print();
+});
 
 document.getElementById('canvas-wrapper').addEventListener('wheel', e => {
   e.preventDefault();
